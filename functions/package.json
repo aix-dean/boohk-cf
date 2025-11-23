@@ -1,0 +1,14 @@
+{
+  "name": "functions",
+  "main": "src/index.js",
+  "scripts": {
+    "deploy": "firebase deploy --only functions"
+  },
+  "dependencies": {
+    "firebase-functions": "^4.0.0",
+    "firebase-admin": "^11.0.0"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  }
+}
