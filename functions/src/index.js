@@ -84,7 +84,7 @@ exports.boohkOnBookingUpdated = onDocumentUpdated({ document: 'booking/{bookingI
 });
 
 exports.boohkUpcomingBookingReminder = onSchedule({
-  schedule: '30 10 * * *',
+  schedule: '53 15 * * *',
   region: 'asia-southeast1',
   timeoutSeconds: 540,
   timeZone: 'Asia/Manila',
@@ -132,8 +132,23 @@ exports.boohkUpcomingBookingReminder = onSchedule({
 
     console.log(`Booking ${docSnapshot.id}: notifying customer ${data.user_id}.`);
 
-    const smsPromises = [sendSMS(userPhone.trim(), message)];
-    allPromises.push(...smsPromises);
+    const smsPromise = sendSMS(userPhone.trim(), message).then(() => {
+      const notificationData = {
+        user_id: data.user_id,
+        message: message,
+        timestamp: admin.firestore.Timestamp.now(),
+        booking_id: docSnapshot.id,
+      };
+      if (data.product_name !== undefined) notificationData.product_name = data.product_name;
+      if (data.start_date !== undefined) notificationData.start_date = data.start_date;
+      if (data.status !== undefined) notificationData.status = data.status;
+      if (data.product_id !== undefined) notificationData.product_id = data.product_id;
+      if (data.company_id !== undefined) notificationData.company_id = data.company_id;
+      return db.collection('boohk_notifications').add(notificationData);
+    }).catch(error => {
+      console.error(`Error sending SMS or creating notification for booking ${docSnapshot.id}:`, error);
+    });
+    allPromises.push(smsPromise);
   }
 
   if (allPromises.length > 0) {
