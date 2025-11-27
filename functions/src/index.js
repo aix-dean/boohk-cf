@@ -1,4 +1,5 @@
 const { onDocumentCreated, onDocumentUpdated } = require('firebase-functions/v2/firestore');
+const { onSchedule } = require('firebase-functions/v2/scheduler');
 const admin = require('firebase-admin');
 const { Vonage } = require('@vonage/server-sdk');
 
@@ -79,5 +80,66 @@ exports.boohkOnBookingUpdated = onDocumentUpdated({ document: 'booking/{bookingI
     console.log('Sales users phone_numbers:', JSON.stringify(phoneNumbers));
     const promises = phoneNumbers.map(({phone}) => phone ? sendSMS(phone, 'A new booking is pending for your company.') : Promise.resolve());
     await Promise.all(promises);
+  }
+});
+
+exports.boohkUpcomingBookingReminder = onSchedule({
+  schedule: '30 10 * * *',
+  region: 'asia-southeast1',
+  timeoutSeconds: 540,
+  timeZone: 'Asia/Manila',
+}, async (event) => {
+  const db = admin.firestore();
+  const now = admin.firestore.Timestamp.now();
+  const threeDaysLater = admin.firestore.Timestamp.fromDate(
+    new Date(now.toDate().getTime() + 3 * 24 * 60 * 60 * 1000)
+  );
+
+  const bookingsSnapshot = await db.collection('booking')
+    .where('start_date', '>=', now)
+    .where('start_date', '<=', threeDaysLater)
+    .get();
+
+  console.log(`Found ${bookingsSnapshot.size} bookings starting within 3 days.`);
+
+  const allPromises = [];
+
+  for (const docSnapshot of bookingsSnapshot.docs) {
+    const data = docSnapshot.data();
+
+    const startDateStr = data.start_date ? data.start_date.toDate().toLocaleDateString() : 'unknown';
+    let message = `Reminder: Booking ${data.product_name} starts within 3 days (${startDateStr}).`;
+    const status = data.status;
+    if (status === 'to pay' || status === 'TO PAY' || status === 'To Pay') {
+      message += " Please complete payment for your booking.";
+    }
+    if (!data.url || data.url === '') {
+      message += " Please upload media for your booking.";
+    }
+
+    const userRef = db.collection('wedflix_users').doc(data.user_id);
+    const userDoc = await userRef.get();
+    if (!userDoc.exists) {
+      console.log(`No wedflix_user found for booking ${docSnapshot.id} user_id: ${data.user_id}`);
+      continue;
+    }
+    const userData = userDoc.data();
+    const userPhone = userData.phone_number;
+    if (!userPhone || typeof userPhone !== 'string' || userPhone.trim().length === 0) {
+      console.log(`No valid phone for user ${data.user_id} in booking ${docSnapshot.id}`);
+      continue;
+    }
+
+    console.log(`Booking ${docSnapshot.id}: notifying customer ${data.user_id}.`);
+
+    const smsPromises = [sendSMS(userPhone.trim(), message)];
+    allPromises.push(...smsPromises);
+  }
+
+  if (allPromises.length > 0) {
+    await Promise.all(allPromises);
+    console.log('All upcoming booking reminders sent.');
+  } else {
+    console.log('No notifications to send.');
   }
 });
