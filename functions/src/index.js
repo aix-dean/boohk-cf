@@ -99,7 +99,7 @@ exports.boohkOnBookingUpdated = onDocumentUpdated({ document: 'booking/{bookingI
 });
 
 exports.boohkUpcomingBookingReminder = onSchedule({
-  schedule: '53 15 * * *',
+  schedule: '16 15 * * *',
   region: 'asia-southeast1',
   timeoutSeconds: 540,
   timeZone: 'Asia/Manila',
@@ -109,6 +109,8 @@ exports.boohkUpcomingBookingReminder = onSchedule({
   const threeDaysLater = admin.firestore.Timestamp.fromDate(
     new Date(now.toDate().getTime() + 3 * 24 * 60 * 60 * 1000)
   );
+    console.log(`exports.boohkUpcomingBookingReminder = onSchedule({
+ is running `);
 
   const bookingsSnapshot = await db.collection('booking')
     .where('start_date', '>=', now)
@@ -146,26 +148,60 @@ exports.boohkUpcomingBookingReminder = onSchedule({
     }
 
     console.log(`Booking ${docSnapshot.id}: notifying customer ${data.user_id}.`);
+  
+    const notificationData = {
+      created: admin.firestore.FieldValue.serverTimestamp(),
+      department_from: 'System',
+      department_to: 'User',
+      description: message,
+      navigate_to: `/booking/${docSnapshot.id}`,
+      title: 'Upcoming Booking Reminder',
+      type: 'Booking Reminder',
+      uid_to: data.user_id,
+      viewed: false,
+      appName: 'wedflix',
+    };
+  
+    const promise = (async () => {
+      try {
+        console.log(`Creating notification for booking ${docSnapshot.id}`);
+        await db.collection('notifications').add(notificationData);
+        console.log(`Notification created successfully for booking ${docSnapshot.id}`);
+      } catch (error) {
+        console.error(`Error creating notification for booking ${docSnapshot.id}:`, error);
+        return;
+      }
 
-    const smsPromise = sendSMS(userPhone.trim(), message).then(() => {
-      const notificationData = {
-        company_id: data.company_id,
-        created: admin.firestore.FieldValue.serverTimestamp(),
-        department_from: 'System',
-        department_to: 'User',
-        description: message,
-        navigate_to: `/booking/${docSnapshot.id}`,
-        title: 'Upcoming Booking Reminder',
-        type: 'Booking Reminder',
-        uid_to: data.user_id,
-        viewed: false,
-        appName: 'wedflix',
-      };
-      return db.collection('notifications').add(notificationData);
-    }).catch(error => {
-      console.error(`Error sending SMS or creating notification for booking ${docSnapshot.id}:`, error);
-    });
-    allPromises.push(smsPromise);
+      const pushPromise = userData.fcm_token ? (async () => {
+        console.log(`FCM token exists for user ${data.user_id}, sending push notification for booking ${docSnapshot.id}`);
+        try {
+          await admin.messaging().send({
+            token: userData.fcm_token,
+            notification: {
+              title: 'Upcoming Booking Reminder',
+              body: message
+            }
+          });
+          console.log(`Push notification sent successfully for booking ${docSnapshot.id}`);
+        } catch (error) {
+          console.error(`Error sending push notification for booking ${docSnapshot.id}:`, error);
+        }
+      })() : (console.log(`No FCM token for user ${data.user_id}, skipping push notification for booking ${docSnapshot.id}`), Promise.resolve());
+
+      const smsPromise = (async () => {
+        console.log(`Sending SMS for booking ${docSnapshot.id} to ${userPhone.trim()}`);
+        try {
+          await sendSMS(userPhone.trim(), message);
+          console.log(`SMS sent successfully for booking ${docSnapshot.id}`);
+        } catch (error) {
+          console.error(`Error sending SMS for booking ${docSnapshot.id}:`, error);
+        }
+      })();
+
+      await Promise.all([pushPromise, smsPromise]);
+    })();
+  
+    allPromises.push(promise);
   }
 
   if (allPromises.length > 0) {
