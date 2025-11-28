@@ -5,6 +5,21 @@ const { Vonage } = require('@vonage/server-sdk');
 
 // Initialize Firebase
 admin.initializeApp();
+/**
+ * @typedef {Object} Notification
+ * @property {string} company_id
+ * @property {admin.firestore.Timestamp} created
+ * @property {string} department_from
+ * @property {string} department_to
+ * @property {string} description
+ * @property {string} navigate_to
+ * @property {string} title
+ * @property {string} type
+ * @property {string|null} uid_to
+ * @property {boolean} viewed
+ * @property {string} appName
+ */
+
 
 const apiKey = "17438318";
 const apiSecret = "syE7YE8okR4bHAGc";
@@ -134,17 +149,19 @@ exports.boohkUpcomingBookingReminder = onSchedule({
 
     const smsPromise = sendSMS(userPhone.trim(), message).then(() => {
       const notificationData = {
-        user_id: data.user_id,
-        message: message,
-        timestamp: admin.firestore.Timestamp.now(),
-        booking_id: docSnapshot.id,
+        company_id: data.company_id,
+        created: admin.firestore.FieldValue.serverTimestamp(),
+        department_from: 'System',
+        department_to: 'User',
+        description: message,
+        navigate_to: `/booking/${docSnapshot.id}`,
+        title: 'Upcoming Booking Reminder',
+        type: 'Booking Reminder',
+        uid_to: data.user_id,
+        viewed: false,
+        appName: 'wedflix',
       };
-      if (data.product_name !== undefined) notificationData.product_name = data.product_name;
-      if (data.start_date !== undefined) notificationData.start_date = data.start_date;
-      if (data.status !== undefined) notificationData.status = data.status;
-      if (data.product_id !== undefined) notificationData.product_id = data.product_id;
-      if (data.company_id !== undefined) notificationData.company_id = data.company_id;
-      return db.collection('boohk_notifications').add(notificationData);
+      return db.collection('notifications').add(notificationData);
     }).catch(error => {
       console.error(`Error sending SMS or creating notification for booking ${docSnapshot.id}:`, error);
     });
