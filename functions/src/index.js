@@ -1,7 +1,7 @@
 const { onDocumentCreated, onDocumentUpdated } = require('firebase-functions/v2/firestore');
 const { onSchedule } = require('firebase-functions/v2/scheduler');
 const admin = require('firebase-admin');
-const { Vonage } = require('@vonage/server-sdk');
+const https = require('https');
 
 // Initialize Firebase
 admin.initializeApp();
@@ -20,9 +20,9 @@ admin.initializeApp();
  * @property {string} appName
  */
 
-
-const apiKey = "17438318";
-const apiSecret = "syE7YE8okR4bHAGc";
+// CloudSMS credentials
+const CLOUDSMS_APP_KEY = '79FF094E62F044EE86A3929500D33504';
+const CLOUDSMS_APP_SECRET = 'PkNbztqWI6iPmNpMqNvFboHpIHrG1zqXFcayjLEi';
 
 
 async function sendSMS(phoneNumber, message) {
@@ -37,22 +37,52 @@ async function sendSMS(phoneNumber, message) {
       phoneNumber = '+63' + phoneNumber.slice(1);
       console.log('Normalized PH number:', phoneNumber);
     }
-    const fromPhone = "Vonage APIs";
+    const fromPhone = "CloudSMS";
     if (phoneNumber.trim() === fromPhone) {
       console.log('Skipping SMS: to/from same number', phoneNumber);
       return;
     }
-    console.log('Sending SMS from:', fromPhone.slice(0,6)+'...', 'to:', phoneNumber.trim());
-    const vonage = new Vonage({
-      apiKey,
-      apiSecret
+    console.log('Sending SMS from:', fromPhone, 'to:', phoneNumber.trim());
+
+    const auth = Buffer.from(`${CLOUDSMS_APP_KEY}:${CLOUDSMS_APP_SECRET}`).toString('base64');
+    const postData = JSON.stringify({
+      destination: phoneNumber.trim(),
+      message: message,
+      type: 'sms'
     });
-    const resp = await vonage.sms.send({
-      to: phoneNumber.trim(),
-      from: fromPhone,
-      text: message
+
+    const options = {
+      hostname: 'api.cloudsms.io',
+      port: 443,
+      path: '/v1/messages',
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Basic ${auth}`,
+        'Content-Length': Buffer.byteLength(postData)
+      }
+    };
+
+    const req = https.request(options, (res) => {
+      let data = '';
+      res.on('data', (chunk) => {
+        data += chunk;
+      });
+      res.on('end', () => {
+        if (res.statusCode >= 200 && res.statusCode < 300) {
+          console.log('Message sent successfully:', data);
+        } else {
+          console.error('Error sending SMS, status:', res.statusCode, 'response:', data);
+        }
+      });
     });
-    console.log('Message sent successfully:', resp);
+
+    req.on('error', (error) => {
+      console.error('Error sending SMS:', error);
+    });
+
+    req.write(postData);
+    req.end();
   } catch (error) {
     console.error('Error sending SMS:', error);
   }
@@ -99,7 +129,7 @@ exports.boohkOnBookingUpdated = onDocumentUpdated({ document: 'booking/{bookingI
 });
 
 exports.boohkUpcomingBookingReminder = onSchedule({
-  schedule: '16 15 * * *',
+  schedule: '07 15 * * *',
   region: 'asia-southeast1',
   timeoutSeconds: 540,
   timeZone: 'Asia/Manila',
