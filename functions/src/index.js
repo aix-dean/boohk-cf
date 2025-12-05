@@ -105,6 +105,24 @@ exports.boohkOnBookingCreated = onDocumentCreated({ document: 'booking/{bookingI
     console.log('Sales users phone_numbers:', JSON.stringify(phoneNumbers));
     const promises = phoneNumbers.map(({phone}) => phone ? sendSMS(phone, 'A new booking is pending for your company.') : Promise.resolve());
     await Promise.all(promises);
+    // Create notifications for sales users
+    for (const doc of usersSnapshot.docs) {
+      const notificationData = {
+        company_id: data.company_id,
+        created: admin.firestore.FieldValue.serverTimestamp(),
+        department_from: 'System',
+        department_to: 'Sales',
+        description: 'A new booking is pending for your company.',
+        navigate_to: '/sales/products/' + snapshot.id,
+        title: 'New Booking Pending',
+        type: 'Booking Created',
+        uid_to: doc.id,
+        viewed: false,
+        appName: 'wedflix',
+        booking_id: snapshot.id,
+      };
+      await db.collection('notifications').add(notificationData);
+    }
   }
   // Handle initial status logic here
 });
@@ -125,6 +143,24 @@ exports.boohkOnBookingUpdated = onDocumentUpdated({ document: 'booking/{bookingI
     console.log('Sales users phone_numbers:', JSON.stringify(phoneNumbers));
     const promises = phoneNumbers.map(({phone}) => phone ? sendSMS(phone, 'A new booking is pending for your company.') : Promise.resolve());
     await Promise.all(promises);
+    // Create notifications for sales users
+    for (const doc of usersSnapshot.docs) {
+      const notificationData = {
+        company_id: after.company_id,
+        created: admin.firestore.FieldValue.serverTimestamp(),
+        department_from: 'System',
+        department_to: 'Sales',
+        description: 'A booking status has been updated to pending for your company.',
+        navigate_to: '/sales/products/' + event.data.after.id,
+        title: 'Booking Status Updated',
+        type: 'Booking Updated',
+        uid_to: doc.id,
+        viewed: false,
+        appName: 'wedflix',
+        booking_id: event.data.after.id,
+      };
+      await db.collection('notifications').add(notificationData);
+    }
   }
 });
 
@@ -182,14 +218,16 @@ exports.boohkUpcomingBookingReminder = onSchedule({
     const notificationData = {
       created: admin.firestore.FieldValue.serverTimestamp(),
       department_from: 'System',
-      department_to: 'User',
+      department_to: 'Sales',
       description: message,
-      navigate_to: `/booking/${docSnapshot.id}`,
+      navigate_to: `/sales/products/${data.product_id}`,
       title: 'Upcoming Booking Reminder',
       type: 'Booking Reminder',
       uid_to: data.user_id,
       viewed: false,
       appName: 'wedflix',
+      company_id: data.company_id,
+      booking_id: docSnapshot.id,
     };
   
     const promise = (async () => {
