@@ -138,7 +138,7 @@ exports.boohkOnBookingCreated = onDocumentCreated({ document: 'booking/{bookingI
         type: 'booking-created',
         uid_to: doc.id,
         viewed: false,
-        appNameFrom : data.appNameFrom ,
+        appNameFrom : data.channel.name ,
         appNameTo: 'boohk',
         booking_id: snapshot.id,
       };
@@ -177,7 +177,7 @@ exports.boohkOnBookingUpdated = onDocumentUpdated({ document: 'booking/{bookingI
         type: 'booking-updated',
         uid_to: doc.id,
         viewed: false,
-         appNameFrom : data.appNameFrom ,
+         appNameFrom : after.channel.name ,
         appNameTo: 'boohk',
         booking_id: event.data.after.id,
       };
@@ -246,7 +246,7 @@ exports.boohkUpcomingBookingReminder = onSchedule({
       type: 'booking-reminder',
       uid_to: data.user_id,
       viewed: false,
-       appNameFrom : data.appNameFrom ,
+       appNameFrom : data.channel.name ,
         appNameTo: 'boohk',
       company_id: data.company_id,
       booking_id: docSnapshot.id,
