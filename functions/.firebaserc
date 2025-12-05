@@ -1,5 +1,7 @@
-{
-  "projects": {
-    "default": "oh-app-bcf24"
+  {
+    "projects": {
+      "default": "oh-app-bcf24",
+      "prod": "oh-app-bcf24",
+      "dev": "oh-app---dev"
+    }
   }
-}

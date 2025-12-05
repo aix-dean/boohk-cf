@@ -1,8 +1,28 @@
 const { onDocumentCreated, onDocumentUpdated } = require('firebase-functions/v2/firestore');
 const { onSchedule } = require('firebase-functions/v2/scheduler');
+const functions = require('firebase-functions');
 const admin = require('firebase-admin');
 const https = require('https');
 
+// For Firebase JS SDK v7.20.0 and later, measurementId is optional
+const firebaseConfigProd = {
+  apiKey: "AIzaSyDk_a7lPHqJBRI2TzxTIMiSPj-E7Xyqizs",
+  authDomain: "oh-app-bcf24.firebaseapp.com",
+  projectId: "oh-app-bcf24",
+  storageBucket: "oh-app-bcf24.appspot.com",
+  messagingSenderId: "272363630855",
+  appId: "1:272363630855:web:5e40310a6a3d180ad915a2",
+  measurementId: "G-SPZMHNQLBK"
+};
+const firebaseConfigDev = {
+  apiKey: "AIzaSyAuJBgnRqX5vMUJ4tEjEG9WhTkLMeb_AjY",
+  authDomain: "oh-app---dev.firebaseapp.com",
+  projectId: "oh-app---dev",
+  storageBucket: "oh-app---dev.appspot.com",
+  messagingSenderId: "1022252630221",
+  appId: "1:1022252630221:web:801c11ff60dbb796b6e984",
+  measurementId: "G-D3QGEWNM1D"
+};
 // Initialize Firebase
 admin.initializeApp();
 /**
@@ -115,10 +135,11 @@ exports.boohkOnBookingCreated = onDocumentCreated({ document: 'booking/{bookingI
         description: 'A new booking is pending for your company.',
         navigate_to: '/sales/products/' + snapshot.id,
         title: 'New Booking Pending',
-        type: 'Booking Created',
+        type: 'booking-created',
         uid_to: doc.id,
         viewed: false,
-        appName: 'wedflix',
+        appNameFrom : data.appNameFrom ,
+        appNameTo: 'boohk',
         booking_id: snapshot.id,
       };
       await db.collection('notifications').add(notificationData);
@@ -153,10 +174,11 @@ exports.boohkOnBookingUpdated = onDocumentUpdated({ document: 'booking/{bookingI
         description: 'A booking status has been updated to pending for your company.',
         navigate_to: '/sales/products/' + event.data.after.id,
         title: 'Booking Status Updated',
-        type: 'Booking Updated',
+        type: 'booking-updated',
         uid_to: doc.id,
         viewed: false,
-        appName: 'wedflix',
+         appNameFrom : data.appNameFrom ,
+        appNameTo: 'boohk',
         booking_id: event.data.after.id,
       };
       await db.collection('notifications').add(notificationData);
@@ -175,8 +197,7 @@ exports.boohkUpcomingBookingReminder = onSchedule({
   const threeDaysLater = admin.firestore.Timestamp.fromDate(
     new Date(now.toDate().getTime() + 3 * 24 * 60 * 60 * 1000)
   );
-    console.log(`exports.boohkUpcomingBookingReminder = onSchedule({
- is running `);
+  console.log('boohkUpcomingBookingReminder is running');
 
   const bookingsSnapshot = await db.collection('booking')
     .where('start_date', '>=', now)
@@ -222,10 +243,11 @@ exports.boohkUpcomingBookingReminder = onSchedule({
       description: message,
       navigate_to: `/sales/products/${data.product_id}`,
       title: 'Upcoming Booking Reminder',
-      type: 'Booking Reminder',
+      type: 'booking-reminder',
       uid_to: data.user_id,
       viewed: false,
-      appName: 'wedflix',
+       appNameFrom : data.appNameFrom ,
+        appNameTo: 'boohk',
       company_id: data.company_id,
       booking_id: docSnapshot.id,
     };
